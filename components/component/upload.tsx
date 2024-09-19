@@ -17,169 +17,517 @@ To read more about using these font, please visit the Next.js documentation:
 - App Directory: https://nextjs.org/docs/app/building-your-application/optimizing/fonts
 - Pages Directory: https://nextjs.org/docs/pages/building-your-application/optimizing/fonts
 **/
-import Link from "next/link"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { LineChart, CartesianGrid, XAxis, Line } from "recharts"
+'use client';
 
-export function upload() {
-  return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-40 border-b bg-background">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="#" className="flex items-center gap-2 font-bold" prefetch={false}>
-            <BarChartIcon className="h-6 w-6" />
-            Portfolio Tracker
-          </Link>
-          <div className="flex items-center gap-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <img
-                    src="/placeholder.svg"
-                    alt="User avatar"
-                    width={32}
-                    height={32}
-                    className="rounded-full"
-                    style={{ aspectRatio: "32/32", objectFit: "cover" }}
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Signed in as</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="/placeholder.svg"
-                      alt="User avatar"
-                      width={24}
-                      height={24}
-                      className="rounded-full"
-                      style={{ aspectRatio: "24/24", objectFit: "cover" }}
-                    />
-                    <div className="grid gap-0.5">
-                      <p className="text-sm font-medium">John Doe</p>
-                      <p className="text-xs text-muted-foreground">john@example.com</p>
-                    </div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
-      <main className="flex-1 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          <div className="grid gap-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload Portfolio</CardTitle>
-                <CardDescription>Upload a CSV file with your stock portfolio data.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form>
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="file">CSV File</Label>
-                      <Input type="file" id="file" accept=".csv" placeholder="Choose file" />
-                    </div>
-                    <Button type="submit">Upload</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Portfolio Performance</CardTitle>
-                <CardDescription>
-                  View your portfolio's net asset value (NAV) against a benchmark index.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    portfolio: { label: "Portfolio", color: "hsl(var(--chart-1))" },
-                    benchmark: { label: "Benchmark", color: "hsl(var(--chart-2))" },
-                  }}
-                  className="min-h-[400px]"
-                >
-                  <LineChart
-                    accessibilityLayer
-                    data={[
-                      { date: "Jan 1", portfolio: 100000, benchmark: 100000 },
-                      { date: "Feb 1", portfolio: 105000, benchmark: 102000 },
-                      { date: "Mar 1", portfolio: 108000, benchmark: 103500 },
-                      { date: "Apr 1", portfolio: 112000, benchmark: 105000 },
-                      { date: "May 1", portfolio: 115000, benchmark: 106500 },
-                      { date: "Jun 1", portfolio: 118000, benchmark: 108000 },
-                    ]}
-                    margin={{ left: 12, right: 12 }}
-                  >
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dashed" />} />
-                    <Line
-                      dataKey="portfolio"
-                      type="natural"
-                      stroke="var(--color-portfolio)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      dataKey="benchmark"
-                      type="natural"
-                      stroke="var(--color-benchmark)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </main>
-      <footer className="border-t bg-background">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <p className="text-sm text-muted-foreground">&copy; 2024 Portfolio Tracker. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground" prefetch={false}>
-              Privacy Policy
-            </Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground" prefetch={false}>
-              Terms of Service
-            </Link>
-          </div>
-        </div>
-      </footer>
-    </div>
-  )
+import React, { useState } from 'react';
+import Papa from 'papaparse';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+const NUM_MONTHS = 6;
+const DURATION = '1yr';
+const MY_FILTER = 'price';
+const API_KEY = process.env.NEXT_PUBLIC_STOCK_API ?? ''; // Replace with your actual API key
+const REFERENCE_SHARE = 'NIFTYBEES';
+const GOOGLE_GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API ?? '';
+const GOOGLE_GEMINI_AI_MODEL_NAME = 'gemini-1.5-flash';
+const genAI = new GoogleGenerativeAI(GOOGLE_GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: GOOGLE_GEMINI_AI_MODEL_NAME });
+
+const indexList = ['NIFTYBEES', 'MONIFTY500', 'GOLDIETF', 'MON100'];
+
+console.log('STOCK_API key present:', !!process.env.NEXT_PUBLIC_STOCK_API);
+
+function processCSV(data: any[]): { filteredData: any[], allShares: string[] } {
+  console.log('processCSV input data length:', data.length);
+  
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  sixMonthsAgo.setDate(1);
+
+  const lastDayOfLastMonth = new Date();
+  lastDayOfLastMonth.setDate(0);
+
+  console.log('Date range:', sixMonthsAgo, 'to', lastDayOfLastMonth);
+
+  const filteredData = data.filter(row => {
+    const tradeDate = new Date(row.trade_date);
+    return tradeDate >= sixMonthsAgo && tradeDate <= lastDayOfLastMonth;
+  });
+
+  console.log('Filtered data length:', filteredData.length);
+  console.log('Sample filtered data:', filteredData.slice(0, 3));
+
+  if (filteredData.length === 0) {
+    console.warn('No data within the specified date range');
+    return { filteredData: [], allShares: [] };
+  }
+
+  const shareHoldings: { [key: string]: number } = {};
+  const cleanedData = filteredData.reduce((acc, row, index) => {
+    console.log(`Processing row ${index + 1}:`, row);
+    const { symbol, trade_type, quantity } = row;
+    if (!symbol || !trade_type || !quantity) {
+      console.warn(`Skipping row ${index + 1} due to missing data:`, row);
+      return acc;
+    }
+    const tradeQuantity = parseInt(quantity);
+    if (isNaN(tradeQuantity)) {
+      console.warn(`Invalid quantity in row ${index + 1}:`, row);
+      return acc;
+    }
+
+    const upperCaseTradeType = trade_type.toUpperCase();
+
+    if (upperCaseTradeType === 'BUY') {
+      shareHoldings[symbol] = (shareHoldings[symbol] || 0) + tradeQuantity;
+      acc.push(row);
+      console.log(`Added BUY transaction for ${symbol}, quantity: ${tradeQuantity}`);
+    } else if (upperCaseTradeType === 'SELL') {
+      if (shareHoldings[symbol] >= tradeQuantity) {
+        shareHoldings[symbol] -= tradeQuantity;
+        acc.push(row);
+        console.log(`Added SELL transaction for ${symbol}, quantity: ${tradeQuantity}`);
+      } else if (shareHoldings[symbol] > 0) {
+        row.quantity = shareHoldings[symbol].toString();
+        shareHoldings[symbol] = 0;
+        acc.push(row);
+        console.log(`Adjusted SELL transaction for ${symbol}, quantity: ${shareHoldings[symbol]}`);
+      } else {
+        console.warn(`Skipping SELL transaction for ${symbol}, insufficient holdings`);
+      }
+    } else {
+      console.warn(`Unknown trade_type in row ${index + 1}:`, row);
+    }
+    return acc;
+  }, []);
+
+  console.log('Cleaned data length:', cleanedData.length);
+  console.log('Sample cleaned data:', cleanedData.slice(0, 3));
+
+  const shareNameList = Array.from(new Set(cleanedData.map((row: { symbol: string }) => row.symbol)));
+  const allShares = Array.from(new Set([...indexList, ...shareNameList])) as string[];
+
+  console.log('All shares:', allShares);
+
+  return { filteredData: cleanedData, allShares };
 }
 
-function BarChartIcon(props) {
+function getSixMonths(): { month: number; year: number }[] {
+  const today = new Date();
+  const months = [];
+  for (let i = 6; i > 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    months.push({ month: d.getMonth() + 1, year: d.getFullYear() });
+  }
+  return months;
+}
+
+async function getClosingPricesForShares(shares: string[], apiKey: string, duration: string, myfilter: string): Promise<Map<string, any[]>> {
+  const masterPrices = new Map();
+
+  for (const share of shares) {
+    const url = `https://stock.indianapi.in/historical_data?stock_name=${share}&period=${duration}&filter=${myfilter}`;
+
+    console.log(`Fetching data for ${share}. API Key: ${apiKey.substring(0, 5)}...`);
+
+    try {
+      const response = await fetch(url, {
+        headers: { 'X-Api-Key': apiKey }
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(`HTTP error! Status: ${response.status}, Response: ${responseText}`);
+      }
+
+      const data = await response.json();
+
+      if (data && data.datasets && data.datasets.length > 0) {
+        const priceDataset = data.datasets.find((dataset: { metric: string }) => dataset.metric === 'Price');
+        const closingPrices = priceDataset.values.map((entry: [string, string]) => ({
+          date: new Date(entry[0]),
+          closingPrice: parseFloat(entry[1])
+        }));
+        masterPrices.set(share, closingPrices);
+      } else {
+        console.error(`No data found for the share: ${share}`);
+        masterPrices.set(share, []);
+      }
+    } catch (error) {
+      console.error(`Error fetching data for ${share}:`, error);
+      masterPrices.set(share, []);
+    }
+  }
+
+  return masterPrices;
+}
+
+
+
+function getLastTradingDays(allMonths: { month: number; year: number }[], masterPrices: Map<string, any[]>): Map<string, Date> {
+  console.log('Starting getLastTradingDays...');
+  const lastDays = new Map();
+
+  const referencePrices = masterPrices.get(REFERENCE_SHARE);
+  if (!referencePrices || referencePrices.length === 0) {
+    console.error(`No price data available for ${REFERENCE_SHARE}`);
+    return lastDays;
+  }
+
+  allMonths.forEach(({ month, year }) => {
+    const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+    console.log(`Processing month: ${monthKey}`);
+
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const startOfNextMonth = new Date(nextYear, nextMonth - 1, 1);
+
+    // Find the last trading day of the current month
+    const lastTradingDay = referencePrices
+      .filter(price => {
+        const priceDate = new Date(price.date);
+        return priceDate.getFullYear() === year && 
+               priceDate.getMonth() === month - 1 && 
+               priceDate < startOfNextMonth;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (lastTradingDay) {
+      lastDays.set(monthKey, new Date(lastTradingDay.date));
+      console.log(`Last trading day for ${monthKey}: ${lastTradingDay.date}`);
+    } else {
+      console.warn(`No trading day found for ${monthKey}`);
+    }
+  });
+
+  console.log('Finished getLastTradingDays');
+  return lastDays;
+}
+
+function generatePortfolioValues(filteredData: any[], lastDays: Map<string, Date>, masterPrices: Map<string, any[]>): any[] {
+  const portfolioValues: { date: Date; portfolioValue: number; alternateValue: number; gain: number }[] = [];
+  let portfolio: { [key: string]: number } = {};
+  let alternatePortfolio = 0;
+
+  lastDays.forEach((lastDay, monthYear) => {
+    console.log(`Processing month: ${monthYear}`);
+    const [year, month] = monthYear.split('-').map(Number);
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = lastDay;
+
+    // Process transactions for the month
+    filteredData.forEach(transaction => {
+      const transactionDate = new Date(transaction.trade_date);
+      if (transactionDate >= monthStart && transactionDate <= monthEnd) {
+        const { symbol, trade_type, quantity, price } = transaction;
+        const shareQuantity = parseInt(quantity);
+        const sharePrice = parseFloat(price);
+
+        console.log(`Processing transaction: ${symbol} ${trade_type} ${shareQuantity} @ ${sharePrice}`);
+
+        if (trade_type.toUpperCase() === 'BUY') {
+          portfolio[symbol] = (portfolio[symbol] || 0) + shareQuantity;
+          const moniftyPrice = masterPrices.get('MONIFTY500')?.find(p => p.date.getTime() === transactionDate.getTime())?.closingPrice;
+          if (moniftyPrice) {
+            alternatePortfolio += (shareQuantity * sharePrice) / moniftyPrice;
+          } else {
+            console.warn(`No MONIFTY500 price found for date: ${transactionDate}`);
+          }
+        } else if (trade_type.toUpperCase() === 'SELL') {
+          portfolio[symbol] = (portfolio[symbol] || 0) - shareQuantity;
+          const moniftyPrice = masterPrices.get('MONIFTY500')?.find(p => p.date.getTime() === transactionDate.getTime())?.closingPrice;
+          if (moniftyPrice) {
+            alternatePortfolio -= (shareQuantity * sharePrice) / moniftyPrice;
+          } else {
+            console.warn(`No MONIFTY500 price found for date: ${transactionDate}`);
+          }
+        }
+      }
+    });
+
+    console.log('Portfolio after transactions:', portfolio);
+
+    // Calculate portfolio value at month end
+    let portfolioValue = 0;
+    Object.entries(portfolio).forEach(([symbol, quantity]) => {
+      const sharePrice = masterPrices.get(symbol)?.find(p => p.date.getTime() === monthEnd.getTime())?.closingPrice;
+      if (sharePrice !== undefined) {
+        portfolioValue += quantity * sharePrice;
+        console.log(`${symbol}: ${quantity} shares @ ${sharePrice} = ${quantity * sharePrice}`);
+      } else {
+        console.warn(`No closing price found for ${symbol} on ${monthEnd}`);
+      }
+    });
+
+    const moniftyEndPrice = masterPrices.get('MONIFTY500')?.find(p => p.date.getTime() === monthEnd.getTime())?.closingPrice;
+    let alternateValue = 0;
+    if (moniftyEndPrice !== undefined) {
+      alternateValue = alternatePortfolio * moniftyEndPrice;
+      console.log(`Alternate portfolio: ${alternatePortfolio} units @ ${moniftyEndPrice} = ${alternateValue}`);
+    } else {
+      console.warn(`No MONIFTY500 closing price found for ${monthEnd}`);
+    }
+
+    portfolioValues.push({
+      date: monthEnd,
+      portfolioValue,
+      alternateValue,
+      gain: ((portfolioValue - alternateValue) / alternateValue) * 100
+    });
+
+    console.log(`Month end values: Portfolio = ${portfolioValue}, Alternate = ${alternateValue}, Gain = ${portfolioValues[portfolioValues.length - 1].gain.toFixed(2)}%`);
+  });
+
+  return portfolioValues;
+}
+
+function downloadObjectAsJson(exportObj: any, exportName: string){
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", exportName + ".json");
+  document.body.appendChild(downloadAnchorNode); // required for firefox
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+}
+
+export default function Upload() {
+  const [file, setFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [filteredData, setFilteredData] = useState<any[]>([]);
+  const [allShares, setAllShares] = useState<string[]>([]);
+  const [masterPrices, setMasterPrices] = useState<Map<string, any[]>>(new Map());
+  const [plotData, setPlotData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [insights, setInsights] = useState<string>('');
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const uploadedFile = event.target.files[0];
+      setFile(uploadedFile);
+
+      Papa.parse(uploadedFile, {
+        complete: (results) => {
+          setCsvData(results.data);
+        },
+        header: true
+      });
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!csvData.length) return;
+    setIsLoading(true);
+    try {
+      const { filteredData, allShares } = processCSV(csvData);
+      const prices = await getClosingPricesForShares(allShares, API_KEY, DURATION, MY_FILTER);
+      const sixMonths = getSixMonths();
+      const lastDays = getLastTradingDays(sixMonths, prices);
+      const portfolioValues = generatePortfolioValues(filteredData, lastDays, prices);
+      setFilteredData(filteredData);
+      setAllShares(allShares);
+      setMasterPrices(prices);
+      setPlotData(portfolioValues);
+      
+      // Wait for the chart to render
+      setTimeout(async () => {
+        await generateInsights();
+      }, 1000); // 1 second delay
+    } catch (error) {
+      console.error('Error processing data:', error);
+      setInsights("Unable to generate insights at this time. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateInsights = async () => {
+    try {
+      const chartImage = document.getElementById('portfolioChart') as HTMLCanvasElement | null;
+      
+      if (!chartImage) {
+        console.warn('Chart image element not found');
+        setInsights("Unable to generate insights: Chart not available. Please ensure the chart is rendered before generating insights.");
+        return;
+      }
+  
+      const imageData = chartImage.toDataURL('image/png').split(',')[1];
+  
+      const prompt = "You are a financial coach tasked with promoting financial insight and learning. The attached chart shows portfolio value compared to benchmark ETF NIFTY500 in India. Ask one question each as Warren Buffett, Charlie Munger and Morgan Housel would ask.";
+  
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: imageData,
+            mimeType: "image/png"
+          }
+        }
+      ]);
+      const response = await result.response;
+      const generatedInsights = response.text();
+  
+      setInsights(generatedInsights);
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      setInsights("Unable to generate insights at this time. Please try again later.");
+    }
+  };
+
+  const renderChart = () => {
+    if (!plotData || plotData.length === 0) return null;
+
+    const data = {
+      labels: plotData.map((d: { date: Date }) => d.date.toLocaleDateString()),
+      datasets: [
+        {
+          label: 'Portfolio Value',
+          data: plotData.map((d: { portfolioValue: number }) => d.portfolioValue),
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+          borderWidth: 3,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          tension: 0.1
+        },
+        {
+          label: 'MONIFTY500 Value',
+          data: plotData.map((d: { alternateValue: number }) => d.alternateValue),
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'rgba(255, 99, 132, 0.5)',
+          borderWidth: 3,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          tension: 0.1
+        }
+      ]
+    };
+
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top' as const,
+          labels: {
+            padding: 40, // Significantly increase padding between legend items
+            font: {
+              size: 16 // Increase font size further
+            },
+            usePointStyle: true, // Use point style for legend items
+            pointStyle: 'circle' // Use circle style for points
+          }
+        },
+        title: {
+          display: true,
+          text: 'Portfolio Value (Green) vs MONIFTY500 (Red)',
+          font: {
+            size: 20 // Increase title font size
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Value',
+            font: {
+              size: 14
+            }
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Date',
+            font: {
+              size: 14
+            }
+          }
+        }
+      }
+    };
+
+    return (
+      <div className="w-full h-full">
+        <Line data={data} options={options} id="portfolioChart" />
+      </div>
+    );
+  };
+
   return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="12" x2="12" y1="20" y2="10" />
-      <line x1="18" x2="18" y1="20" y2="4" />
-      <line x1="6" x2="6" y1="20" y2="16" />
-    </svg>
-  )
+    <div className="w-full">
+      <header className="w-full bg-navy-blue text-white py-4 mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-center font-helvetica">
+          Capstan
+        </h1>
+      </header>
+      <div className="max-w-4xl mx-auto px-4">
+        <h2 className="text-lg md:text-xl text-navy-blue font-semibold text-center mb-4">
+          Gain insights about your portfolio
+        </h2>
+        <p className="text-sm md:text-base text-navy-blue text-center mb-8">
+          Upload a trade log of your stocks for the past six months (csv)
+        </p>
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <input 
+            type="file" 
+            accept=".csv" 
+            onChange={handleFileUpload}
+            className="w-full md:w-auto"
+          />
+          <button 
+            onClick={handleGenerate} 
+            disabled={!file || isLoading}
+            className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            Generate
+          </button>
+        </div>
+        {file && <p className="mb-4">Selected file: {file.name}</p>}
+        {isLoading && <p className="mb-4">Processing data, please wait...</p>}
+        <div className="w-full h-[300px] md:h-[400px] lg:h-[500px]">
+          {plotData && plotData.length > 0 && renderChart()}
+        </div>
+        {insights && (
+        <div style={{ marginTop: '20px' }}>
+          <h3 style={{ fontFamily: 'Helvetica', fontSize: '14px', color: 'claret' }}>Insights</h3>
+          <textarea
+            readOnly
+            value={insights}
+            style={{
+              width: '100%',
+              minHeight: '150px',
+              padding: '10px',
+              whiteSpace: 'pre-line',
+              lineHeight: '2.5'
+            }}
+          />
+        </div>
+      )}        
+      </div>
+    </div>
+  );
 }
