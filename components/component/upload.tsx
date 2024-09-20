@@ -370,7 +370,8 @@ export default function UploadComponent() {
   const [plotData, setPlotData] = useState<PlotDataPoint[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [insights, setInsights] = useState<string>("");
-  const [chartImage, setChartImage] = useState<string | null>(null);
+  // const [chartImage, setChartImage] = useState<string | null>(null);
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const uploadedFile = event.target.files[0];
@@ -450,7 +451,7 @@ export default function UploadComponent() {
       }
 
       const imageData = chartImage.toDataURL("image/png").split(",")[1];
-      setChartImage(imageData);
+      //  setChartImage(imageData);
       const prompt =
         "You are a financial coach tasked with promoting financial insight and learning. The attached chart shows portfolio value compared to benchmark ETF NIFTY500 in India. Ask one question each as Warren Buffett, Charlie Munger and Morgan Housel would ask.";
 

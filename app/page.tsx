@@ -28,7 +28,7 @@ export default function Home() {
             <CardHeader>
               <CardTitle>Upload Your Investment Data</CardTitle>
               <CardDescription>
-                We'll analyze your data and generate insightful questions.
+                We will analyze your data and generate insightful questions.
               </CardDescription>
             </CardHeader>
             <CardContent>
