@@ -32,7 +32,6 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 ChartJS.register(
   CategoryScale,
@@ -46,12 +45,7 @@ ChartJS.register(
 
 const DURATION = '1yr';
 const MY_FILTER = 'price';
-const API_KEY = process.env.NEXT_PUBLIC_STOCK_API ?? '';
 const REFERENCE_SHARE = 'NIFTYBEES';
-const GOOGLE_GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API ?? '';
-const GOOGLE_GEMINI_AI_MODEL_NAME = 'gemini-1.5-flash';
-const genAI = new GoogleGenerativeAI(GOOGLE_GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: GOOGLE_GEMINI_AI_MODEL_NAME });
 
 const indexList = ['NIFTYBEES', 'MONIFTY500', 'GOLDIETF', 'MON100'];
 
@@ -153,21 +147,18 @@ interface PriceData {
 
 async function getClosingPricesForShares(
   shares: string[], 
-  apiKey: string, 
   duration: string, 
   myfilter: string
 ): Promise<Map<string, PriceData[]>> {
   const masterPrices = new Map<string, PriceData[]>();
 
   for (const share of shares) {
-    const url = `https://stock.indianapi.in/historical_data?stock_name=${share}&period=${duration}&filter=${myfilter}`;
+    const url = `/api/stock-data?stock_name=${share}&period=${duration}&filter=${myfilter}`;
 
     console.log(`Fetching data for ${share}`);
 
     try {
-      const response = await fetch(url, {
-        headers: { 'X-Api-Key': apiKey }
-      });
+      const response = await fetch(url);
 
       if (!response.ok) {
         const responseText = await response.text();
@@ -178,11 +169,16 @@ async function getClosingPricesForShares(
 
       if (data && data.datasets && data.datasets.length > 0) {
         const priceDataset = data.datasets.find((dataset: { metric: string }) => dataset.metric === 'Price');
-        const closingPrices: PriceData[] = priceDataset.values.map((entry: [string, string]) => ({
-          date: new Date(entry[0]),
-          closingPrice: parseFloat(entry[1])
-        }));
-        masterPrices.set(share, closingPrices);
+        if (priceDataset && priceDataset.values) {
+          const closingPrices: PriceData[] = priceDataset.values.map((entry: [string, string]) => ({
+            date: new Date(entry[0]),
+            closingPrice: parseFloat(entry[1])
+          }));
+          masterPrices.set(share, closingPrices);
+        } else {
+          console.error(`No price data found for the share: ${share}`);
+          masterPrices.set(share, []);
+        }
       } else {
         console.error(`No data found for the share: ${share}`);
         masterPrices.set(share, []);
@@ -352,7 +348,7 @@ export default function Upload() {
     try {
       const { filteredData } = processCSV(csvData);
       const allShares = Array.from(new Set([...indexList, ...filteredData.map((row: { symbol: string }) => row.symbol)])) as string[];
-      const prices = await getClosingPricesForShares(allShares, API_KEY, DURATION, MY_FILTER);
+      const prices = await getClosingPricesForShares(allShares, DURATION, MY_FILTER);
       const sixMonths = getSixMonths();
       const lastDays = getLastTradingDays(sixMonths, prices);
       const portfolioValues = generatePortfolioValues(filteredData, lastDays, prices);
@@ -385,19 +381,20 @@ export default function Upload() {
   
       const prompt = "You are a financial coach tasked with promoting financial insight and learning. The attached chart shows portfolio value compared to benchmark ETF NIFTY500 in India. Ask one question each as Warren Buffett, Charlie Munger and Morgan Housel would ask.";
   
-      const result = await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            data: imageData,
-            mimeType: "image/png"
-          }
-        }
-      ]);
-      const response = await result.response;
-      const generatedInsights = response.text();
-  
-      setInsights(generatedInsights);
+      const response = await fetch('/api/generate-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt, imageData }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      setInsights(result.text);
     } catch (error) {
       console.error("Error generating insights:", error);
       setInsights("Unable to generate insights at this time. Please try again later.");
