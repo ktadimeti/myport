@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const API_KEY = process.env.STOCK_API;
 
   if (!API_KEY) {
+    console.error('API key is not set');
     return NextResponse.json({ error: 'API key is not set' }, { status: 500 });
   }
 
