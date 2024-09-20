@@ -44,10 +44,9 @@ ChartJS.register(
   Legend
 );
 
-const NUM_MONTHS = 6;
 const DURATION = '1yr';
 const MY_FILTER = 'price';
-const API_KEY = process.env.NEXT_PUBLIC_STOCK_API ?? ''; // Replace with your actual API key
+const API_KEY = process.env.NEXT_PUBLIC_STOCK_API ?? '';
 const REFERENCE_SHARE = 'NIFTYBEES';
 const GOOGLE_GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API ?? '';
 const GOOGLE_GEMINI_AI_MODEL_NAME = 'gemini-1.5-flash';
@@ -56,9 +55,17 @@ const model = genAI.getGenerativeModel({ model: GOOGLE_GEMINI_AI_MODEL_NAME });
 
 const indexList = ['NIFTYBEES', 'MONIFTY500', 'GOLDIETF', 'MON100'];
 
-console.log('STOCK_API key present:', !!process.env.NEXT_PUBLIC_STOCK_API);
+// Define an interface for the CSV data structure
+interface CSVRow {
+  symbol: string;
+  trade_type: string;
+  quantity: string;
+  price: string;
+  trade_date: string;
+  // Add any other fields that are present in your CSV
+}
 
-function processCSV(data: any[]): { filteredData: any[], allShares: string[] } {
+function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
   console.log('processCSV input data length:', data.length);
   
   const sixMonthsAgo = new Date();
@@ -80,11 +87,11 @@ function processCSV(data: any[]): { filteredData: any[], allShares: string[] } {
 
   if (filteredData.length === 0) {
     console.warn('No data within the specified date range');
-    return { filteredData: [], allShares: [] };
+    return { filteredData: [] };
   }
 
   const shareHoldings: { [key: string]: number } = {};
-  const cleanedData = filteredData.reduce((acc, row, index) => {
+  const cleanedData = filteredData.reduce<CSVRow[]>((acc, row, index) => {
     console.log(`Processing row ${index + 1}:`, row);
     const { symbol, trade_type, quantity } = row;
     if (!symbol || !trade_type || !quantity) {
@@ -125,12 +132,7 @@ function processCSV(data: any[]): { filteredData: any[], allShares: string[] } {
   console.log('Cleaned data length:', cleanedData.length);
   console.log('Sample cleaned data:', cleanedData.slice(0, 3));
 
-  const shareNameList = Array.from(new Set(cleanedData.map((row: { symbol: string }) => row.symbol)));
-  const allShares = Array.from(new Set([...indexList, ...shareNameList])) as string[];
-
-  console.log('All shares:', allShares);
-
-  return { filteredData: cleanedData, allShares };
+  return { filteredData: cleanedData };
 }
 
 function getSixMonths(): { month: number; year: number }[] {
@@ -143,13 +145,24 @@ function getSixMonths(): { month: number; year: number }[] {
   return months;
 }
 
-async function getClosingPricesForShares(shares: string[], apiKey: string, duration: string, myfilter: string): Promise<Map<string, any[]>> {
-  const masterPrices = new Map();
+// Define an interface for the price data structure
+interface PriceData {
+  date: Date;
+  closingPrice: number;
+}
+
+async function getClosingPricesForShares(
+  shares: string[], 
+  apiKey: string, 
+  duration: string, 
+  myfilter: string
+): Promise<Map<string, PriceData[]>> {
+  const masterPrices = new Map<string, PriceData[]>();
 
   for (const share of shares) {
     const url = `https://stock.indianapi.in/historical_data?stock_name=${share}&period=${duration}&filter=${myfilter}`;
 
-    console.log(`Fetching data for ${share}. API Key: ${apiKey.substring(0, 5)}...`);
+    console.log(`Fetching data for ${share}`);
 
     try {
       const response = await fetch(url, {
@@ -165,7 +178,7 @@ async function getClosingPricesForShares(shares: string[], apiKey: string, durat
 
       if (data && data.datasets && data.datasets.length > 0) {
         const priceDataset = data.datasets.find((dataset: { metric: string }) => dataset.metric === 'Price');
-        const closingPrices = priceDataset.values.map((entry: [string, string]) => ({
+        const closingPrices: PriceData[] = priceDataset.values.map((entry: [string, string]) => ({
           date: new Date(entry[0]),
           closingPrice: parseFloat(entry[1])
         }));
@@ -183,9 +196,7 @@ async function getClosingPricesForShares(shares: string[], apiKey: string, durat
   return masterPrices;
 }
 
-
-
-function getLastTradingDays(allMonths: { month: number; year: number }[], masterPrices: Map<string, any[]>): Map<string, Date> {
+function getLastTradingDays(allMonths: { month: number; year: number }[], masterPrices: Map<string, PriceData[]>): Map<string, Date> {
   console.log('Starting getLastTradingDays...');
   const lastDays = new Map();
 
@@ -225,9 +236,20 @@ function getLastTradingDays(allMonths: { month: number; year: number }[], master
   return lastDays;
 }
 
-function generatePortfolioValues(filteredData: any[], lastDays: Map<string, Date>, masterPrices: Map<string, any[]>): any[] {
-  const portfolioValues: { date: Date; portfolioValue: number; alternateValue: number; gain: number }[] = [];
-  let portfolio: { [key: string]: number } = {};
+interface PlotDataPoint {
+  date: Date;
+  portfolioValue: number;
+  alternateValue: number;
+  gain: number;
+}
+
+function generatePortfolioValues(
+  filteredData: CSVRow[], 
+  lastDays: Map<string, Date>, 
+  masterPrices: Map<string, PriceData[]>
+): PlotDataPoint[] {
+  const portfolioValues: PlotDataPoint[] = [];
+  const portfolio: { [key: string]: number } = {};
   let alternatePortfolio = 0;
 
   lastDays.forEach((lastDay, monthYear) => {
@@ -302,23 +324,11 @@ function generatePortfolioValues(filteredData: any[], lastDays: Map<string, Date
   return portfolioValues;
 }
 
-function downloadObjectAsJson(exportObj: any, exportName: string){
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
-  const downloadAnchorNode = document.createElement('a');
-  downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", exportName + ".json");
-  document.body.appendChild(downloadAnchorNode); // required for firefox
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
-}
-
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
-  const [csvData, setCsvData] = useState<any[]>([]);
-  const [filteredData, setFilteredData] = useState<any[]>([]);
-  const [allShares, setAllShares] = useState<string[]>([]);
-  const [masterPrices, setMasterPrices] = useState<Map<string, any[]>>(new Map());
-  const [plotData, setPlotData] = useState<any>(null);
+  const [csvData, setCsvData] = useState<CSVRow[]>([]);
+  const [filteredData, setFilteredData] = useState<CSVRow[]>([]);
+  const [plotData, setPlotData] = useState<PlotDataPoint[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [insights, setInsights] = useState<string>('');
 
@@ -327,7 +337,7 @@ export default function Upload() {
       const uploadedFile = event.target.files[0];
       setFile(uploadedFile);
 
-      Papa.parse(uploadedFile, {
+      Papa.parse<CSVRow>(uploadedFile, {
         complete: (results) => {
           setCsvData(results.data);
         },
@@ -340,14 +350,13 @@ export default function Upload() {
     if (!csvData.length) return;
     setIsLoading(true);
     try {
-      const { filteredData, allShares } = processCSV(csvData);
+      const { filteredData } = processCSV(csvData);
+      const allShares = Array.from(new Set([...indexList, ...filteredData.map((row: { symbol: string }) => row.symbol)])) as string[];
       const prices = await getClosingPricesForShares(allShares, API_KEY, DURATION, MY_FILTER);
       const sixMonths = getSixMonths();
       const lastDays = getLastTradingDays(sixMonths, prices);
       const portfolioValues = generatePortfolioValues(filteredData, lastDays, prices);
       setFilteredData(filteredData);
-      setAllShares(allShares);
-      setMasterPrices(prices);
       setPlotData(portfolioValues);
       
       // Wait for the chart to render
