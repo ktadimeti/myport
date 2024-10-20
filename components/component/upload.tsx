@@ -32,6 +32,8 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+  Legend,
+} from "chart.js";
 
 ChartJS.register(
   CategoryScale,
@@ -50,6 +52,12 @@ const REFERENCE_SHARE = "NIFTYBEES";
 const indexList = ["NIFTYBEES", "MONIFTY500", "GOLDIETF", "MON100"];
 
 // Define an interface for the CSV data structure
+const DURATION = "1yr";
+const MY_FILTER = "price";
+const REFERENCE_SHARE = "NIFTYBEES";
+
+const indexList = ["NIFTYBEES", "MONIFTY500", "GOLDIETF", "MON100"];
+
 interface CSVRow {
   symbol: string;
   trade_type: string;
@@ -62,6 +70,8 @@ interface CSVRow {
 function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
   console.log("processCSV input data length:", data.length);
 
+  console.log("processCSV input data length:", data.length);
+
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
   sixMonthsAgo.setDate(1);
@@ -70,7 +80,9 @@ function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
   lastDayOfLastMonth.setDate(0);
 
   console.log("Date range:", sixMonthsAgo, "to", lastDayOfLastMonth);
+  console.log("Date range:", sixMonthsAgo, "to", lastDayOfLastMonth);
 
+  const filteredData = data.filter((row) => {
   const filteredData = data.filter((row) => {
     const tradeDate = new Date(row.trade_date);
     return tradeDate >= sixMonthsAgo && tradeDate <= lastDayOfLastMonth;
@@ -78,8 +90,11 @@ function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
 
   console.log("Filtered data length:", filteredData.length);
   console.log("Sample filtered data:", filteredData.slice(0, 3));
+  console.log("Filtered data length:", filteredData.length);
+  console.log("Sample filtered data:", filteredData.slice(0, 3));
 
   if (filteredData.length === 0) {
+    console.warn("No data within the specified date range");
     console.warn("No data within the specified date range");
     return { filteredData: [] };
   }
@@ -101,8 +116,13 @@ function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
     const upperCaseTradeType = trade_type.toUpperCase();
 
     if (upperCaseTradeType === "BUY") {
+    if (upperCaseTradeType === "BUY") {
       shareHoldings[symbol] = (shareHoldings[symbol] || 0) + tradeQuantity;
       acc.push(row);
+      console.log(
+        `Added BUY transaction for ${symbol}, quantity: ${tradeQuantity}`
+      );
+    } else if (upperCaseTradeType === "SELL") {
       console.log(
         `Added BUY transaction for ${symbol}, quantity: ${tradeQuantity}`
       );
@@ -113,6 +133,9 @@ function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
         console.log(
           `Added SELL transaction for ${symbol}, quantity: ${tradeQuantity}`
         );
+        console.log(
+          `Added SELL transaction for ${symbol}, quantity: ${tradeQuantity}`
+        );
       } else if (shareHoldings[symbol] > 0) {
         row.quantity = shareHoldings[symbol].toString();
         shareHoldings[symbol] = 0;
@@ -120,7 +143,13 @@ function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
         console.log(
           `Adjusted SELL transaction for ${symbol}, quantity: ${shareHoldings[symbol]}`
         );
+        console.log(
+          `Adjusted SELL transaction for ${symbol}, quantity: ${shareHoldings[symbol]}`
+        );
       } else {
+        console.warn(
+          `Skipping SELL transaction for ${symbol}, insufficient holdings`
+        );
         console.warn(
           `Skipping SELL transaction for ${symbol}, insufficient holdings`
         );
@@ -137,14 +166,11 @@ function processCSV(data: CSVRow[]): { filteredData: CSVRow[] } {
   return { filteredData: cleanedData };
 }
 
-function getSixMonths(): { month: number; year: number }[] {
-  const today = new Date();
-  const months = [];
-  for (let i = 6; i > 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    months.push({ month: d.getMonth() + 1, year: d.getFullYear() });
-  }
-  return months;
+interface PlotDataPoint {
+  date: Date;
+  portfolioValue: number;
+  alternateValue: number;
+  gain: number;
 }
 
 // Define an interface for the price data structure
@@ -153,7 +179,13 @@ interface PriceData {
   closingPrice: number;
 }
 
+const API_KEY = process.env.NEXT_PUBLIC_STOCK_API;
+
+// ... rest of your imports and component setup ...
+
 async function getClosingPricesForShares(
+  shares: string[],
+  duration: string,
   shares: string[],
   duration: string,
   myfilter: string
@@ -161,15 +193,20 @@ async function getClosingPricesForShares(
   const masterPrices = new Map<string, PriceData[]>();
 
   for (const share of shares) {
-    const url = `/api/stock-data?stock_name=${share}&period=${duration}&filter=${myfilter}`;
+    const url = `https://stock.indianapi.in/historical_data?stock_name=${share}&period=${duration}&filter=${myfilter}`;
 
     console.log(`Fetching data for ${share}`);
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: { "X-Api-Key": API_KEY || "" },
+      });
 
       if (!response.ok) {
         const responseText = await response.text();
+        throw new Error(
+          `HTTP error! Status: ${response.status}, Response: ${responseText}`
+        );
         throw new Error(
           `HTTP error! Status: ${response.status}, Response: ${responseText}`
         );
@@ -181,7 +218,16 @@ async function getClosingPricesForShares(
         const priceDataset = data.datasets.find(
           (dataset: { metric: string }) => dataset.metric === "Price"
         );
+        const priceDataset = data.datasets.find(
+          (dataset: { metric: string }) => dataset.metric === "Price"
+        );
         if (priceDataset && priceDataset.values) {
+          const closingPrices: PriceData[] = priceDataset.values.map(
+            (entry: [string, string]) => ({
+              date: new Date(entry[0]),
+              closingPrice: parseFloat(entry[1]),
+            })
+          );
           const closingPrices: PriceData[] = priceDataset.values.map(
             (entry: [string, string]) => ({
               date: new Date(entry[0]),
@@ -221,6 +267,7 @@ function getLastTradingDays(
 
   allMonths.forEach(({ month, year }) => {
     const monthKey = `${year}-${month.toString().padStart(2, "0")}`;
+    const monthKey = `${year}-${month.toString().padStart(2, "0")}`;
     console.log(`Processing month: ${monthKey}`);
 
     const nextMonth = month === 12 ? 1 : month + 1;
@@ -230,13 +277,22 @@ function getLastTradingDays(
     // Find the last trading day of the current month
     const lastTradingDay = referencePrices
       .filter((price) => {
+      .filter((price) => {
         const priceDate = new Date(price.date);
         return (
           priceDate.getFullYear() === year &&
           priceDate.getMonth() === month - 1 &&
           priceDate < startOfNextMonth
         );
+        return (
+          priceDate.getFullYear() === year &&
+          priceDate.getMonth() === month - 1 &&
+          priceDate < startOfNextMonth
+        );
       })
+      .sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      )[0];
       .sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       )[0];
@@ -250,17 +306,13 @@ function getLastTradingDays(
   });
 
   console.log("Finished getLastTradingDays");
+  console.log("Finished getLastTradingDays");
   return lastDays;
 }
 
-interface PlotDataPoint {
-  date: Date;
-  portfolioValue: number;
-  alternateValue: number;
-  gain: number;
-}
-
 function generatePortfolioValues(
+  filteredData: CSVRow[],
+  lastDays: Map<string, Date>,
   filteredData: CSVRow[],
   lastDays: Map<string, Date>,
   masterPrices: Map<string, PriceData[]>
@@ -272,10 +324,12 @@ function generatePortfolioValues(
   lastDays.forEach((lastDay, monthYear) => {
     console.log(`Processing month: ${monthYear}`);
     const [year, month] = monthYear.split("-").map(Number);
+    const [year, month] = monthYear.split("-").map(Number);
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = lastDay;
 
     // Process transactions for the month
+    filteredData.forEach((transaction) => {
     filteredData.forEach((transaction) => {
       const transactionDate = new Date(transaction.trade_date);
       if (transactionDate >= monthStart && transactionDate <= monthEnd) {
@@ -286,9 +340,18 @@ function generatePortfolioValues(
         console.log(
           `Processing transaction: ${symbol} ${trade_type} ${shareQuantity} @ ${sharePrice}`
         );
+        console.log(
+          `Processing transaction: ${symbol} ${trade_type} ${shareQuantity} @ ${sharePrice}`
+        );
 
         if (trade_type.toUpperCase() === "BUY") {
+        if (trade_type.toUpperCase() === "BUY") {
           portfolio[symbol] = (portfolio[symbol] || 0) + shareQuantity;
+          const moniftyPrice = masterPrices
+            .get("MONIFTY500")
+            ?.find(
+              (p) => p.date.getTime() === transactionDate.getTime()
+            )?.closingPrice;
           const moniftyPrice = masterPrices
             .get("MONIFTY500")
             ?.find(
@@ -300,9 +363,18 @@ function generatePortfolioValues(
             console.warn(
               `No MONIFTY500 price found for date: ${transactionDate}`
             );
+            console.warn(
+              `No MONIFTY500 price found for date: ${transactionDate}`
+            );
           }
         } else if (trade_type.toUpperCase() === "SELL") {
+        } else if (trade_type.toUpperCase() === "SELL") {
           portfolio[symbol] = (portfolio[symbol] || 0) - shareQuantity;
+          const moniftyPrice = masterPrices
+            .get("MONIFTY500")
+            ?.find(
+              (p) => p.date.getTime() === transactionDate.getTime()
+            )?.closingPrice;
           const moniftyPrice = masterPrices
             .get("MONIFTY500")
             ?.find(
@@ -314,11 +386,15 @@ function generatePortfolioValues(
             console.warn(
               `No MONIFTY500 price found for date: ${transactionDate}`
             );
+            console.warn(
+              `No MONIFTY500 price found for date: ${transactionDate}`
+            );
           }
         }
       }
     });
 
+    console.log("Portfolio after transactions:", portfolio);
     console.log("Portfolio after transactions:", portfolio);
 
     // Calculate portfolio value at month end
@@ -327,8 +403,16 @@ function generatePortfolioValues(
       const sharePrice = masterPrices
         .get(symbol)
         ?.find((p) => p.date.getTime() === monthEnd.getTime())?.closingPrice;
+      const sharePrice = masterPrices
+        .get(symbol)
+        ?.find((p) => p.date.getTime() === monthEnd.getTime())?.closingPrice;
       if (sharePrice !== undefined) {
         portfolioValue += quantity * sharePrice;
+        console.log(
+          `${symbol}: ${quantity} shares @ ${sharePrice} = ${
+            quantity * sharePrice
+          }`
+        );
         console.log(
           `${symbol}: ${quantity} shares @ ${sharePrice} = ${
             quantity * sharePrice
@@ -342,9 +426,15 @@ function generatePortfolioValues(
     const moniftyEndPrice = masterPrices
       .get("MONIFTY500")
       ?.find((p) => p.date.getTime() === monthEnd.getTime())?.closingPrice;
+    const moniftyEndPrice = masterPrices
+      .get("MONIFTY500")
+      ?.find((p) => p.date.getTime() === monthEnd.getTime())?.closingPrice;
     let alternateValue = 0;
     if (moniftyEndPrice !== undefined) {
       alternateValue = alternatePortfolio * moniftyEndPrice;
+      console.log(
+        `Alternate portfolio: ${alternatePortfolio} units @ ${moniftyEndPrice} = ${alternateValue}`
+      );
       console.log(
         `Alternate portfolio: ${alternatePortfolio} units @ ${moniftyEndPrice} = ${alternateValue}`
       );
@@ -357,8 +447,14 @@ function generatePortfolioValues(
       portfolioValue,
       alternateValue,
       gain: ((portfolioValue - alternateValue) / alternateValue) * 100,
+      gain: ((portfolioValue - alternateValue) / alternateValue) * 100,
     });
 
+    console.log(
+      `Month end values: Portfolio = ${portfolioValue}, Alternate = ${alternateValue}, Gain = ${portfolioValues[
+        portfolioValues.length - 1
+      ].gain.toFixed(2)}%`
+    );
     console.log(
       `Month end values: Portfolio = ${portfolioValue}, Alternate = ${alternateValue}, Gain = ${portfolioValues[
         portfolioValues.length - 1
@@ -369,7 +465,7 @@ function generatePortfolioValues(
   return portfolioValues;
 }
 
-export default function Upload() {
+export default function UploadComponent() {
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<CSVRow[]>([]);
   const [filteredData, setFilteredData] = useState<CSVRow[]>([]);
@@ -386,6 +482,7 @@ export default function Upload() {
         complete: (results) => {
           setCsvData(results.data);
         },
+        header: true,
         header: true,
       });
     }
@@ -407,8 +504,24 @@ export default function Upload() {
         DURATION,
         MY_FILTER
       );
+      const allShares = Array.from(
+        new Set([
+          ...indexList,
+          ...filteredData.map((row: { symbol: string }) => row.symbol),
+        ])
+      ) as string[];
+      const prices = await getClosingPricesForShares(
+        allShares,
+        DURATION,
+        MY_FILTER
+      );
       const sixMonths = getSixMonths();
       const lastDays = getLastTradingDays(sixMonths, prices);
+      const portfolioValues = generatePortfolioValues(
+        filteredData,
+        lastDays,
+        prices
+      );
       const portfolioValues = generatePortfolioValues(
         filteredData,
         lastDays,
@@ -417,11 +530,16 @@ export default function Upload() {
       setFilteredData(filteredData);
       setPlotData(portfolioValues);
 
+
       // Wait for the chart to render
       setTimeout(async () => {
         await generateInsights();
       }, 1000); // 1 second delay
     } catch (error) {
+      console.error("Error processing data:", error);
+      setInsights(
+        "Unable to generate insights at this time. Please try again later."
+      );
       console.error("Error processing data:", error);
       setInsights(
         "Unable to generate insights at this time. Please try again later."
@@ -438,6 +556,10 @@ export default function Upload() {
       ) as HTMLCanvasElement | null;
 
       if (!chartImage) {
+        console.warn("Chart image element not found");
+        setInsights(
+          "Unable to generate insights: Chart not available. Please ensure the chart is rendered before generating insights."
+        );
         console.warn("Chart image element not found");
         setInsights(
           "Unable to generate insights: Chart not available. Please ensure the chart is rendered before generating insights."
@@ -476,8 +598,45 @@ export default function Upload() {
       setInsights(
         "Unable to generate insights at this time. Please try again later."
       );
+      setInsights(
+        "Unable to generate insights at this time. Please try again later."
+      );
     }
   };
+
+  // const generateInsights = async () => {
+  //   try {
+  //     const chartImage = document.getElementById('portfolioChart') as HTMLCanvasElement | null;
+
+  //     if (!chartImage) {
+  //       console.warn('Chart image element not found');
+  //       setInsights("Unable to generate insights: Chart not available. Please ensure the chart is rendered before generating insights.");
+  //       return;
+  //     }
+
+  //     const imageData = chartImage.toDataURL('image/png').split(',')[1];
+
+  //     const prompt = "You are a financial coach tasked with promoting financial insight and learning. The attached chart shows portfolio value compared to benchmark ETF NIFTY500 in India. Ask one question each as Warren Buffett, Charlie Munger and Morgan Housel would ask.";
+
+  //     const response = await fetch('/api/generate-insights', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ prompt, imageData }),
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+
+  //     const result = await response.json();
+  //     setInsights(result.text);
+  //   } catch (error) {
+  //     console.error("Error generating insights:", error);
+  //     setInsights("Unable to generate insights at this time. Please try again later.");
+  //   }
+  // };
 
   const renderChart = () => {
     if (!plotData || plotData.length === 0) return null;
@@ -492,12 +651,25 @@ export default function Upload() {
           ),
           borderColor: "rgb(75, 192, 192)",
           backgroundColor: "rgba(75, 192, 192, 0.5)",
+          label: "Portfolio Value",
+          data: plotData.map(
+            (d: { portfolioValue: number }) => d.portfolioValue
+          ),
+          borderColor: "rgb(75, 192, 192)",
+          backgroundColor: "rgba(75, 192, 192, 0.5)",
           borderWidth: 3,
           pointRadius: 5,
           pointHoverRadius: 8,
           tension: 0.1,
+          tension: 0.1,
         },
         {
+          label: "MONIFTY500 Value",
+          data: plotData.map(
+            (d: { alternateValue: number }) => d.alternateValue
+          ),
+          borderColor: "rgb(255, 99, 132)",
+          backgroundColor: "rgba(255, 99, 132, 0.5)",
           label: "MONIFTY500 Value",
           data: plotData.map(
             (d: { alternateValue: number }) => d.alternateValue
@@ -510,6 +682,9 @@ export default function Upload() {
           tension: 0.1,
         },
       ],
+          tension: 0.1,
+        },
+      ],
     };
 
     const options = {
@@ -518,19 +693,27 @@ export default function Upload() {
       plugins: {
         legend: {
           position: "top" as const,
+          position: "top" as const,
           labels: {
             padding: 40, // Significantly increase padding between legend items
             font: {
               size: 16, // Increase font size further
+              size: 16, // Increase font size further
             },
             usePointStyle: true, // Use point style for legend items
+            pointStyle: "circle", // Use circle style for points
+          },
             pointStyle: "circle", // Use circle style for points
           },
         },
         title: {
           display: true,
           text: "Portfolio Value (Green) vs MONIFTY500 (Red)",
+          text: "Portfolio Value (Green) vs MONIFTY500 (Red)",
           font: {
+            size: 20, // Increase title font size
+          },
+        },
             size: 20, // Increase title font size
           },
         },
@@ -541,7 +724,11 @@ export default function Upload() {
           title: {
             display: true,
             text: "Value",
+            text: "Value",
             font: {
+              size: 14,
+            },
+          },
               size: 14,
             },
           },
@@ -550,7 +737,13 @@ export default function Upload() {
           title: {
             display: true,
             text: "Date",
+            text: "Date",
             font: {
+              size: 14,
+            },
+          },
+        },
+      },
               size: 14,
             },
           },
@@ -564,7 +757,6 @@ export default function Upload() {
       </div>
     );
   };
-
   return (
     <div className="w-full min-h-screen flex flex-col">
       <header className="w-full bg-navy-blue text-white py-4">
